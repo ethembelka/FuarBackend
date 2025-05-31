@@ -63,12 +63,16 @@ public class SecurityConfig {
                     "/api/v1/speakers/*/events",
                     "/api/v1/events",
                     "/api/v1/events/all",
+                    "/api/v1/events/*",
                     "/api/v1/events/*/details",
                     "/api/v1/events/upcoming",
                     "/api/v1/events/available",
                     "/api/v1/events/search",
                     "/api/v1/events/between",
-                    "/api/v1/users/**"
+                    "/api/v1/users/**",
+                    "/api/v1/education/user/*",
+                    "/api/v1/work-experience/user/*",
+                    "/api/v1/publications/user/*"
                 ).permitAll()
                 // Protected endpoints that require authentication
                 .requestMatchers(
