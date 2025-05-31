@@ -1,0 +1,169 @@
+# Gradle
+.gradle/
+build/
+**/build/
+fair-project/build/
+fair-project/.gradle/
+
+# Gradle wrapper - özel olarak dahil edilecek dosyalar
+!gradle/wrapper/
+!gradle-wrapper.jar
+!gradle-wrapper.properties
+
+# IDE - IntelliJ IDEA
+.idea/
+**/.idea/
+*.iml
+*.ipr
+*.iws
+
+# IDE - VS Code
+.vscode/
+**/.vscode/
+
+# IDE - Eclipse/STS
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+# Build output
+**/target/
+**/build/
+
+# Package Files
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# Compiled class files
+*.class
+
+# Gradle
+.gradle
+**/build/
+!gradle-wrapper.jar
+
+# IntelliJ
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# NetBeans
+/nbproject/private/
+/build/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# VS Code
+.vscode/
+.settings/
+
+# Application Properties
+**/application.properties
+**/application.yml
+**/application-*.properties
+**/application-*.yml
+
+# Logs
+*.log
+logs/
+
+# System Files
+.DS_Store
+Thumbs.db
+
+# Backup Files
+*.bak
+
+# STS
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# NetBeans
+fair-project/nbproject/private/
+fair-project/nbbuild/
+fair-project/dist/
+fair-project/nbdist/
+fair-project/.nb-gradle/
+fair-project/build/
+!fair-project/**/src/main/**/build/
+!fair-project/**/src/test/**/build/
+
+# VS Code
+.vscode/
+
+# Application Properties
+fair-project/src/main/resources/application.properties
+fair-project/src/main/resources/application-dev.properties
+fair-project/src/main/resources/application-prod.properties
+
+# Logs
+*.log
+fair-project/logs/
+
+# Compiled class files
+*.class
+
+# Package Files
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# BlueJ files
+*.ctxt
+
+# Mobile Tools for Java (J2ME)
+.mtj.tmp/
+
+# Maven
+fair-project/pom.xml.tag
+fair-project/pom.xml.releaseBackup
+fair-project/pom.xml.versionsBackup
+fair-project/pom.xml.next
+fair-project/release.properties
+fair-project/dependency-reduced-pom.xml
+fair-project/buildNumber.properties
+fair-project/.mvn/timing.properties
+
+# Gradle
+fair-project/.gradle
+fair-project/**/build/
+!fair-project/src/**/build/
+fair-project/gradle-app.setting
+!fair-project/gradle-wrapper.jar
+!fair-project/gradle-wrapper.properties
+fair-project/.gradletasknamecache
+
+# System Files
+.DS_Store
+Thumbs.db
+
+# Virtual machine crash logs
+hs_err_pid*
+replay_pid*
