@@ -2,12 +2,21 @@ package com.fuar.controller;
 
 import com.fuar.model.Role;
 import com.fuar.model.User;
+import com.fuar.model.UserInfo;
 import com.fuar.repository.UserRepository;
+import com.fuar.service.UserInfoService;
+import com.fuar.service.EducationService;
+import com.fuar.service.WorkExperienceService;
+import com.fuar.service.SkillService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -16,6 +25,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class UserController {
     private final UserRepository userRepository;
+    private final UserInfoService userInfoService;
+    private final EducationService educationService;
+    private final WorkExperienceService workExperienceService;
+    private final SkillService skillService;
 
     /**
      * Get all users
@@ -100,4 +113,67 @@ public class UserController {
             return ResponseEntity.internalServerError().build();
         }
     }
+
+    /**
+     * Get the current authenticated user's profile with all related information
+     * @return Complete user profile data
+     */
+    @GetMapping("/me/profile")
+    public ResponseEntity<?> getCurrentUserProfile() {
+    try {
+        // Get the authenticated user from security context
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(401).body("User not authenticated");
+        }
+        
+        // Get user email from authentication
+        String email = authentication.getName();
+        Optional<User> userOpt = userRepository.findByEmail(email);
+        
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.status(404).body("User not found");
+        }
+        
+        User user = userOpt.get();
+        Long userId = user.getId();
+        
+        // Create response map
+        Map<String, Object> response = new HashMap<>();
+        
+        // Basic user info
+        Map<String, Object> userMap = new HashMap<>();
+        userMap.put("id", user.getId());
+        userMap.put("name", user.getName());
+        userMap.put("email", user.getEmail());
+        userMap.put("image", user.getImage());
+        userMap.put("role", user.getRole());
+        response.put("user", userMap);
+        
+        try {
+            // Get user detailed info
+            UserInfo userInfo = userInfoService.getUserInfo(userId);
+            response.put("userInfo", userInfo);
+            
+            // Get user education
+            response.put("education", educationService.getUserEducation(userId));
+            
+            // Get work experience
+            response.put("workExperience", workExperienceService.getUserWorkExperiences(userId));
+            
+            // Get skills
+            response.put("skills", userInfo.getSkills());
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            // If user info not found, return just basic user data
+            System.err.println("User profile details retrieval error: " + e.getMessage());
+            return ResponseEntity.ok(response);
+        }
+    } catch (Exception e) {
+        System.err.println("Kullanıcı profili alınırken hata oluştu: " + e.getMessage());
+        e.printStackTrace();
+        return ResponseEntity.internalServerError().body("An error occurred while fetching user profile");
+    }
+  }
 }

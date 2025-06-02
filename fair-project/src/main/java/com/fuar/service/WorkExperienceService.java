@@ -16,8 +16,10 @@ public class WorkExperienceService {
     private final WorkExperienceRepository workExperienceRepository;
     private final UserInfoRepository userInfoRepository;
 
-    public List<WorkExperience> getUserWorkExperiences(Long userInfoId) {
-        return workExperienceRepository.findByUserInfo_IdOrderByStartDateDesc(userInfoId);
+    public List<WorkExperience> getUserWorkExperiences(Long userId) {
+        UserInfo userInfo = userInfoRepository.findByUser_Id(userId)
+            .orElseThrow(() -> new RuntimeException("UserInfo not found for user: " + userId));
+        return workExperienceRepository.findByUserInfo_IdOrderByStartDateDesc(userInfo.getId());
     }
 
     @Transactional

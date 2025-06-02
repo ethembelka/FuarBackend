@@ -18,8 +18,10 @@ public class EducationService {
     private final EducationRepository educationRepository;
     private final UserInfoRepository userInfoRepository;
 
-    public List<EducationDTO> getUserEducation(Long userInfoId) {
-        return educationRepository.findByUserInfo_IdOrderByStartDateDesc(userInfoId)
+    public List<EducationDTO> getUserEducation(Long userId) {
+        UserInfo userInfo = userInfoRepository.findByUser_Id(userId)
+            .orElseThrow(() -> new RuntimeException("UserInfo not found for user: " + userId));
+        return educationRepository.findByUserInfo_IdOrderByStartDateDesc(userInfo.getId())
             .stream()
             .map(this::convertToDTO)
             .collect(Collectors.toList());
