@@ -18,7 +18,20 @@ public class UserInfoController {
 
     @GetMapping("/{userId}")
     public ResponseEntity<UserInfo> getUserInfo(@PathVariable Long userId) {
-        return ResponseEntity.ok(userInfoService.getUserInfo(userId));
+        try {
+            return ResponseEntity.ok(userInfoService.getUserInfo(userId));
+        } catch (RuntimeException e) {
+            if (e.getMessage().contains("UserInfo not found")) {
+                // Try to create a new UserInfo for this user
+                boolean created = userInfoService.createUserInfoIfNotExists(userId);
+                if (created) {
+                    // Successfully created, now return it
+                    return ResponseEntity.ok(userInfoService.getUserInfo(userId));
+                }
+            }
+            // If we couldn't create or some other error occurred, rethrow
+            throw e;
+        }
     }
 
     @PutMapping("/{userId}")
@@ -27,25 +40,43 @@ public class UserInfoController {
             @PathVariable Long userId,
             @RequestBody UserInfoDTO userInfoDTO
     ) {
-        UserInfo userInfo = new UserInfo();
-        // Map DTO to entity
-        userInfo.setBio(userInfoDTO.getBio());
-        userInfo.setHeadLine(userInfoDTO.getHeadLine());
-        userInfo.setLocation(userInfoDTO.getLocation());
-        userInfo.setCountry(userInfoDTO.getCountry());
-        userInfo.setLinkedinUrl(userInfoDTO.getLinkedinUrl());
-        userInfo.setGithubUrl(userInfoDTO.getGithubUrl());
-        userInfo.setPersonalWebsite(userInfoDTO.getPersonalWebsite());
-        userInfo.setTwitterUrl(userInfoDTO.getTwitterUrl());
-        userInfo.setInstagramUrl(userInfoDTO.getInstagramUrl());
-        userInfo.setFacebookUrl(userInfoDTO.getFacebookUrl());
-        userInfo.setYoutubeUrl(userInfoDTO.getYoutubeUrl());
-        userInfo.setMediumUrl(userInfoDTO.getMediumUrl());
-        userInfo.setScholarUrl(userInfoDTO.getScholarUrl());
-        userInfo.setResearchGateUrl(userInfoDTO.getResearchGateUrl());
-        userInfo.setOrcidId(userInfoDTO.getOrcidId());
-
-        return ResponseEntity.ok(userInfoService.updateUserInfo(userId, userInfo));
+        try {
+            // First check if the user's UserInfo record exists
+            boolean created = false;
+            try {
+                userInfoService.getUserInfo(userId);
+            } catch (RuntimeException e) {
+                if (e.getMessage().contains("UserInfo not found")) {
+                    // UserInfo record doesn't exist, create it
+                    System.out.println("UserInfo not found for user " + userId + ", attempting to create one");
+                    created = userInfoService.createUserInfoIfNotExists(userId);
+                    if (!created) {
+                        System.err.println("Failed to create UserInfo for user " + userId);
+                        return ResponseEntity.status(500)
+                            .body(null); // Creation failed
+                    }
+                    System.out.println("Successfully created UserInfo for user " + userId);
+                } else {
+                    throw e; // Some other error
+                }
+            }
+            
+            // Now send the DTO values to the service
+            try {
+                UserInfo updatedInfo = userInfoService.updateUserInfoFields(userId, userInfoDTO);
+                return ResponseEntity.ok(updatedInfo);
+            } catch (Exception e) {
+                System.err.println("Error updating UserInfo for user " + userId + ": " + e.getMessage());
+                e.printStackTrace();
+                return ResponseEntity.status(500)
+                    .body(null);
+            }
+        } catch (Exception e) {
+            System.err.println("Unexpected error in updateUserInfo: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500)
+                .body(null);
+        }
     }
 
     @PostMapping("/{userId}/skills/{skillId}")

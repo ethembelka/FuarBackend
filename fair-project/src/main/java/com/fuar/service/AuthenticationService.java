@@ -3,11 +3,9 @@ package com.fuar.service;
 import com.fuar.dto.AuthenticationRequest;
 import com.fuar.dto.AuthenticationResponse;
 import com.fuar.dto.RegisterRequest;
-import com.fuar.model.Role;
-import com.fuar.model.Token;
-import com.fuar.model.TokenType;
-import com.fuar.model.User;
+import com.fuar.model.*;
 import com.fuar.repository.TokenRepository;
+import com.fuar.repository.UserInfoRepository;
 import com.fuar.repository.UserRepository;
 import com.fuar.security.JwtService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -18,10 +16,13 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.HashSet;
+
 @Service
 @RequiredArgsConstructor
 public class AuthenticationService {
     private final UserRepository userRepository;
+    private final UserInfoRepository userInfoRepository;
     private final TokenRepository tokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
@@ -34,16 +35,34 @@ public class AuthenticationService {
         }
         
         try {
+            // Create user object
             var user = User.builder()
                     .name(request.getName())
                     .email(request.getEmail())
                     .password(passwordEncoder.encode(request.getPassword()))
                     .role(Role.USER)
                     .build();
+            
+            // First save the user without UserInfo to get a valid ID
             var savedUser = userRepository.save(user);
+            
+            // Now create UserInfo and associate it with the saved user
+            var userInfo = new UserInfo();
+            userInfo.setUser(savedUser);
+            userInfo.setSkills(new HashSet<>());
+            
+            // Save UserInfo with the proper repository
+            var savedUserInfo = userInfoRepository.save(userInfo);
+            
+            // Update the user with the new UserInfo reference
+            savedUser.setUserInfo(savedUserInfo);
+            savedUser = userRepository.save(savedUser);
+            
+            // Generate tokens
             var jwtToken = jwtService.generateToken(user);
             var refreshToken = jwtService.generateRefreshToken(user);
             saveUserToken(savedUser, jwtToken);
+            
             return AuthenticationResponse.builder()
                     .accessToken(jwtToken)
                     .refreshToken(refreshToken)

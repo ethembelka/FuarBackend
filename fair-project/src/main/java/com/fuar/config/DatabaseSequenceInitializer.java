@@ -25,6 +25,11 @@ public class DatabaseSequenceInitializer implements ApplicationRunner {
         resetSequence("users");
         resetSequence("events");
         resetSequence("token");
+        resetSequence("user_info");
+        resetSequence("skills");
+        resetSequence("educations");
+        resetSequence("publications");
+        resetSequence("work_experiences");
         // Add other sequences as needed
     }
 
