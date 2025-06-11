@@ -72,7 +72,8 @@ public class SecurityConfig {
                     "/api/v1/users/**",
                     "/api/v1/education/user/*",
                     "/api/v1/work-experience/user/*",
-                    "/api/v1/publications/user/*"
+                    "/api/v1/publications/user/*",
+                    "/uploads/**"  // Allow access to uploaded files
                 ).permitAll()
                 // Protected endpoints that require authentication
                 .requestMatchers(

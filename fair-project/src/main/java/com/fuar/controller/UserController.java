@@ -13,7 +13,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.File;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -174,6 +176,279 @@ public class UserController {
         System.err.println("Kullanıcı profili alınırken hata oluştu: " + e.getMessage());
         e.printStackTrace();
         return ResponseEntity.internalServerError().body("An error occurred while fetching user profile");
+    }
+  }
+
+  /**
+   * Upload a profile image for a user
+   * @param userId User ID
+   * @param file The image file to upload
+   * @return Updated user with image URL
+   */
+  @PostMapping("/{userId}/profile-image")
+  public ResponseEntity<?> uploadProfileImage(
+      @PathVariable Long userId,
+      @RequestParam("file") MultipartFile file
+  ) {
+    try {
+      // Check if user exists
+      Optional<User> userOpt = userRepository.findById(userId);
+      if (userOpt.isEmpty()) {
+        return ResponseEntity.status(404).body("User not found");
+      }
+
+      User user = userOpt.get();
+      
+      // Verify authorization - only allow users to upload their own profile image
+      Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+      if (authentication == null || !authentication.isAuthenticated() || 
+          !authentication.getName().equals(user.getEmail())) {
+        return ResponseEntity.status(403).body("Not authorized to update this user's profile image");
+      }
+      
+      // Validate the file
+      if (file.isEmpty()) {
+        return ResponseEntity.badRequest().body("File is empty");
+      }
+      
+      // Check file type
+      String contentType = file.getContentType();
+      if (contentType == null || !contentType.startsWith("image/")) {
+        return ResponseEntity.badRequest().body("Only image files are allowed");
+      }
+      
+      // Limit file size (5MB)
+      if (file.getSize() > 5 * 1024 * 1024) {
+        return ResponseEntity.badRequest().body("File size exceeds maximum limit of 5MB");
+      }
+      
+      // Generate a unique filename
+      String originalFilename = file.getOriginalFilename();
+      String extension = originalFilename != null && originalFilename.contains(".") ? 
+          originalFilename.substring(originalFilename.lastIndexOf(".")) : ".jpg";
+      String filename = "profile_" + userId + "_" + System.currentTimeMillis() + extension;
+      
+      // Get project root directory for primary storage location
+      String projectRoot = System.getProperty("user.dir");
+      String projectUploadDir = projectRoot + "/uploads/profiles/";
+      
+      // Define alternative upload directories as fallbacks
+      String[] uploadDirs = {
+          projectUploadDir, // Project directory (primary)
+          System.getProperty("java.io.tmpdir") + "/uploads/profiles/", // Temp directory
+          System.getProperty("user.home") + "/uploads/profiles/", // Home directory
+          "uploads/profiles/" // Relative directory
+      };
+      
+      // Try to save file in each directory until successful
+      File savedFile = null;
+      String usedDirectory = null;
+      Exception lastException = null;
+      
+      for (String dir : uploadDirs) {
+          File directory = new File(dir);
+          
+          // Create directory if it doesn't exist
+          if (!directory.exists()) {
+              try {
+                  boolean created = directory.mkdirs();
+                  if (created) {
+                      System.out.println("Created directory: " + directory.getAbsolutePath());
+                      
+                      // Try to make directory world-readable on Unix systems
+                      try {
+                          Process process = Runtime.getRuntime().exec("chmod 755 " + directory.getAbsolutePath());
+                          int exitCode = process.waitFor();
+                          if (exitCode == 0) {
+                              System.out.println("Set permissions for directory: " + directory.getAbsolutePath());
+                          }
+                      } catch (Exception e) {
+                          // Ignore permission setting errors, just log them
+                          System.out.println("Could not set permissions: " + e.getMessage());
+                      }
+                  } else {
+                      System.err.println("Failed to create directory: " + directory.getAbsolutePath());
+                      continue; // Skip to next directory
+                  }
+              } catch (Exception e) {
+                  System.err.println("Error creating directory " + directory.getAbsolutePath() + ": " + e.getMessage());
+                  continue; // Skip to next directory
+              }
+          }
+          
+          // Check if directory is writable
+          if (!directory.canWrite()) {
+              System.err.println("Directory not writable: " + directory.getAbsolutePath());
+              continue; // Skip to next directory
+          }
+          
+          File targetFile = new File(directory, filename);
+          
+          try {
+              // Try to save the file
+              file.transferTo(targetFile);
+              
+              // Verify file was saved
+              if (targetFile.exists() && targetFile.length() > 0) {
+                  System.out.println("File saved successfully to: " + targetFile.getAbsolutePath());
+                  savedFile = targetFile;
+                  usedDirectory = dir;
+                  break; // Successfully saved, exit the loop
+              } else {
+                  System.err.println("File saving verification failed: " + targetFile.getAbsolutePath());
+              }
+          } catch (Exception e) {
+              System.err.println("Error saving to " + targetFile.getAbsolutePath() + ": " + e.getMessage());
+              lastException = e;
+          }
+      }
+      
+      // If all attempts failed, return an error
+      if (savedFile == null) {
+          String errorMsg = "Failed to save file to any location";
+          if (lastException != null) {
+              errorMsg += ": " + lastException.getMessage();
+          }
+          System.err.println(errorMsg);
+          return ResponseEntity.status(500).body(errorMsg);
+      }
+      
+      // Clean up old profile image if it exists
+      String oldImagePath = user.getImage();
+      if (oldImagePath != null && !oldImagePath.isEmpty()) {
+          if (oldImagePath.contains("/")) {
+              // Extract the filename from the path
+              String oldFilename = oldImagePath.substring(oldImagePath.lastIndexOf("/") + 1);
+              
+              // Try to delete from all possible locations
+              for (String dir : uploadDirs) {
+                  File oldFile = new File(dir, oldFilename);
+                  if (oldFile.exists() && oldFile.isFile()) {
+                      boolean deleted = oldFile.delete();
+                      if (deleted) {
+                          System.out.println("Successfully deleted old image: " + oldFile.getAbsolutePath());
+                      } else {
+                          System.err.println("Failed to delete old image: " + oldFile.getAbsolutePath());
+                      }
+                  }
+              }
+          }
+      }
+      
+      // Update the user's image field with the relative path for URL construction
+      String imagePath = "/uploads/profiles/" + filename;
+      user.setImage(imagePath);
+      userRepository.save(user);
+      
+      System.out.println("Profile image updated successfully:");
+      System.out.println("- File saved to: " + savedFile.getAbsolutePath());
+      System.out.println("- Image URL path set to: " + imagePath);
+      System.out.println("- Used directory: " + usedDirectory);
+      System.out.println("- User ID: " + user.getId());
+      
+      // Create response with updated user data
+      Map<String, Object> response = new HashMap<>();
+      Map<String, Object> userMap = new HashMap<>();
+      userMap.put("id", user.getId());
+      userMap.put("name", user.getName());
+      userMap.put("email", user.getEmail());
+      userMap.put("image", user.getImage());
+      userMap.put("role", user.getRole());
+      response.put("user", userMap);
+      
+      return ResponseEntity.ok(response);
+    } catch (Exception e) {
+      System.err.println("Error uploading profile image: " + e.getMessage());
+      e.printStackTrace();
+      return ResponseEntity.internalServerError().body("Error uploading profile image: " + e.getMessage());
+    }
+  }
+  
+  /**
+   * Delete a user's profile image
+   * @param userId User ID
+   * @return Updated user with null image URL
+   */
+  @DeleteMapping("/{userId}/profile-image")
+  public ResponseEntity<?> deleteProfileImage(@PathVariable Long userId) {
+    try {
+      // Check if user exists
+      Optional<User> userOpt = userRepository.findById(userId);
+      if (userOpt.isEmpty()) {
+        return ResponseEntity.status(404).body("User not found");
+      }
+
+      User user = userOpt.get();
+      
+      // Verify authorization - only allow users to delete their own profile image
+      Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+      if (authentication == null || !authentication.isAuthenticated() || 
+          !authentication.getName().equals(user.getEmail())) {
+        return ResponseEntity.status(403).body("Not authorized to update this user's profile image");
+      }
+      
+      // Delete the file if it exists
+      String imagePath = user.getImage();
+      if (imagePath != null && !imagePath.isEmpty()) {
+        // Define possible upload directories
+        String[] uploadDirs = {
+            System.getProperty("user.dir") + "/uploads/profiles/", // Project directory
+            System.getProperty("java.io.tmpdir") + "/uploads/profiles/", // Temp directory
+            System.getProperty("user.home") + "/uploads/profiles/", // Home directory
+            "uploads/profiles/" // Relative directory
+        };
+        
+        if (imagePath.contains("/")) {
+          // Extract the filename from the image path
+          String filename = imagePath.substring(imagePath.lastIndexOf("/") + 1);
+          
+          boolean deleted = false;
+          
+          // Try to delete from all possible locations
+          for (String dir : uploadDirs) {
+            File imageFile = new File(dir, filename);
+            if (imageFile.exists() && imageFile.isFile()) {
+              try {
+                boolean success = imageFile.delete();
+                if (success) {
+                  System.out.println("Successfully deleted file: " + imageFile.getAbsolutePath());
+                  deleted = true;
+                } else {
+                  System.err.println("Failed to delete file: " + imageFile.getAbsolutePath());
+                }
+              } catch (Exception e) {
+                System.err.println("Error deleting file " + imageFile.getAbsolutePath() + ": " + e.getMessage());
+              }
+            }
+          }
+          
+          if (!deleted) {
+            System.err.println("Could not find or delete profile image file for path: " + imagePath);
+          }
+        }
+      }
+      
+      // Update the user's image field to null
+      user.setImage(null);
+      userRepository.save(user);
+      
+      System.out.println("Profile image removed for user ID: " + user.getId());
+      
+      // Create response with updated user data
+      Map<String, Object> response = new HashMap<>();
+      Map<String, Object> userMap = new HashMap<>();
+      userMap.put("id", user.getId());
+      userMap.put("name", user.getName());
+      userMap.put("email", user.getEmail());
+      userMap.put("image", user.getImage());
+      userMap.put("role", user.getRole());
+      response.put("user", userMap);
+      
+      return ResponseEntity.ok(response);
+    } catch (Exception e) {
+      System.err.println("Error deleting profile image: " + e.getMessage());
+      e.printStackTrace();
+      return ResponseEntity.internalServerError().body("Error deleting profile image: " + e.getMessage());
     }
   }
 }
