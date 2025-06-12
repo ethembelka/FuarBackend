@@ -36,7 +36,15 @@ public class JwtService {
     }
 
     public String generateToken(UserDetails userDetails) {
-        return generateToken(new HashMap<>(), userDetails);
+        Map<String, Object> claims = new HashMap<>();
+        if (userDetails instanceof com.fuar.model.User) {
+            com.fuar.model.User user = (com.fuar.model.User) userDetails;
+            claims.put("role", user.getRole().name());
+            claims.put("name", user.getName());
+            claims.put("id", user.getId());
+            claims.put("email", user.getEmail());
+        }
+        return generateToken(claims, userDetails);
     }
 
     public String generateToken(Map<String, Object> extraClaims, UserDetails userDetails) {

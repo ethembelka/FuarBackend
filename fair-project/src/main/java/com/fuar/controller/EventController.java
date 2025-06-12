@@ -13,6 +13,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.File;
+import java.util.HashMap;
+import java.util.Map;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -25,6 +30,131 @@ import java.util.stream.Collectors;
 public class EventController {
     private final EventService eventService;
     private final EventMapper eventMapper;
+
+    @PostMapping("/image/upload")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> uploadEventImage(
+            @RequestParam("image") MultipartFile file
+    ) {
+        try {
+            // Validate the file
+            if (file.isEmpty()) {
+                return ResponseEntity.badRequest().body("File is empty");
+            }
+
+            // Check file type
+            String contentType = file.getContentType();
+            if (contentType == null || !contentType.startsWith("image/")) {
+                return ResponseEntity.badRequest().body("Only image files are allowed");
+            }
+
+            // Limit file size (5MB)
+            if (file.getSize() > 5 * 1024 * 1024) {
+                return ResponseEntity.badRequest().body("File size exceeds maximum limit of 5MB");
+            }
+
+            // Get project root directory
+            String projectRoot = System.getProperty("user.dir");
+
+            // Generate a unique filename
+            String originalFilename = file.getOriginalFilename();
+            String extension = originalFilename != null && originalFilename.contains(".") ? 
+                originalFilename.substring(originalFilename.lastIndexOf(".")) : ".jpg";
+            String filename = "event_" + System.currentTimeMillis() + extension;
+
+            // Set up possible upload directories
+            String[] uploadDirs = {
+                projectRoot + "/uploads/eventPhotos/",
+                System.getProperty("java.io.tmpdir") + "/uploads/eventPhotos/",
+                System.getProperty("user.home") + "/uploads/eventPhotos/",
+                "uploads/eventPhotos/"
+            };
+
+            File savedFile = null;
+            String usedDirectory = null;
+            Exception lastException = null;
+
+            // Try each directory until successful
+            for (String dir : uploadDirs) {
+                File directory = new File(dir);
+
+                // Create directory if it doesn't exist
+                if (!directory.exists()) {
+                    try {
+                        boolean created = directory.mkdirs();
+                        if (created) {
+                            // Try to make directory world-readable on Unix systems
+                            try {
+                                Process process = Runtime.getRuntime().exec("chmod 755 " + directory.getAbsolutePath());
+                                int exitCode = process.waitFor();
+                                if (exitCode == 0) {
+                                    System.out.println("Set permissions for directory: " + directory.getAbsolutePath());
+                                }
+                            } catch (Exception e) {
+                                System.out.println("Could not set permissions: " + e.getMessage());
+                            }
+                        } else {
+                            System.err.println("Failed to create directory: " + directory.getAbsolutePath());
+                            continue;
+                        }
+                    } catch (Exception e) {
+                        System.err.println("Error creating directory " + directory.getAbsolutePath() + ": " + e.getMessage());
+                        continue;
+                    }
+                }
+
+                if (!directory.canWrite()) {
+                    System.err.println("Directory not writable: " + directory.getAbsolutePath());
+                    continue;
+                }
+
+                File targetFile = new File(directory, filename);
+
+                try {
+                    file.transferTo(targetFile);
+
+                    if (targetFile.exists() && targetFile.length() > 0) {
+                        System.out.println("File saved successfully to: " + targetFile.getAbsolutePath());
+                        savedFile = targetFile;
+                        usedDirectory = dir;
+                        break;
+                    } else {
+                        System.err.println("File saving verification failed: " + targetFile.getAbsolutePath());
+                    }
+                } catch (Exception e) {
+                    System.err.println("Error saving to " + targetFile.getAbsolutePath() + ": " + e.getMessage());
+                    lastException = e;
+                }
+            }
+
+            // If all attempts failed, return an error
+            if (savedFile == null) {
+                String errorMsg = "Failed to save file to any location";
+                if (lastException != null) {
+                    errorMsg += ": " + lastException.getMessage();
+                }
+                System.err.println(errorMsg);
+                return ResponseEntity.status(500).body(errorMsg);
+            }
+
+            // Create the URL path for the image
+            String imagePath = "/uploads/eventPhotos/" + filename;
+
+            System.out.println("Event image upload successful:");
+            System.out.println("- File saved to: " + savedFile.getAbsolutePath());
+            System.out.println("- Image URL path: " + imagePath);
+
+            // Return the image URL in the response
+            Map<String, String> response = new HashMap<>();
+            response.put("url", imagePath);
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            System.err.println("Error uploading event image: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body("Error uploading event image: " + e.getMessage());
+        }
+    }
 
     @GetMapping
     public ResponseEntity<?> getAllEvents() {
