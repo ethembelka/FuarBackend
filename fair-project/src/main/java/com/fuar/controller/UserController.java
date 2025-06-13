@@ -1,6 +1,7 @@
 package com.fuar.controller;
 
 import com.fuar.dto.CreateUserRequest;
+import com.fuar.dto.UpdateUserRequest;
 import com.fuar.model.Role;
 import com.fuar.model.User;
 import com.fuar.model.UserInfo;
@@ -762,6 +763,83 @@ public class UserController {
           e.printStackTrace();
           return ResponseEntity.internalServerError()
                   .body("Error deleting user: " + e.getMessage());
+      }
+  }
+
+  /**
+   * Update a user and their related information
+   * @param userId User ID to update
+   * @param updateUserRequest Updated user information
+   * @return Updated user
+   */
+  @PutMapping("/{userId}")
+  @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.id")
+  public ResponseEntity<?> updateUser(@PathVariable Long userId, @RequestBody @Valid UpdateUserRequest updateUserRequest) {
+      try {
+          // Check if user exists
+          User user = userRepository.findById(userId)
+                  .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
+
+          // Update basic user information
+          if (updateUserRequest.getName() != null) {
+              user.setName(updateUserRequest.getName());
+          }
+          
+          // Only admins can change roles
+          Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+          boolean isAdmin = authentication.getAuthorities().stream()
+                  .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+          
+          if (isAdmin && updateUserRequest.getRole() != null) {
+              user.setRole(updateUserRequest.getRole());
+          }
+          
+          // Update email if provided and different from current
+          if (updateUserRequest.getEmail() != null && !updateUserRequest.getEmail().equals(user.getEmail())) {
+              // Check if email is already in use
+              if (userRepository.findByEmail(updateUserRequest.getEmail()).isPresent()) {
+                  return ResponseEntity.badRequest().body("Email is already in use");
+              }
+              user.setEmail(updateUserRequest.getEmail());
+          }
+          
+          // Update password if provided
+          if (updateUserRequest.getPassword() != null && !updateUserRequest.getPassword().isEmpty()) {
+              user.setPassword(passwordEncoder.encode(updateUserRequest.getPassword()));
+          }
+          
+          // Update image if provided
+          if (updateUserRequest.getImage() != null) {
+              user.setImage(updateUserRequest.getImage());
+          }
+          
+          // Save updated user
+          User updatedUser = userRepository.save(user);
+          
+          // Update UserInfo if provided
+          if (updateUserRequest.getUserInfo() != null) {
+              try {
+                  // Try to get or create UserInfo
+                  userInfoService.createUserInfoIfNotExists(userId);
+                  
+                  // Update UserInfo fields
+                  userInfoService.updateUserInfoFields(userId, updateUserRequest.getUserInfo());
+              } catch (Exception e) {
+                  System.err.println("Error updating UserInfo: " + e.getMessage());
+                  e.printStackTrace();
+                  // Continue even if UserInfo update fails
+              }
+          }
+          
+          // Get the updated user with refreshed relations
+          User refreshedUser = userRepository.findById(userId).orElse(updatedUser);
+          refreshedUser.setPassword(null); // Don't return password in response
+          
+          return ResponseEntity.ok(refreshedUser);
+      } catch (Exception e) {
+          System.err.println("Error updating user: " + e.getMessage());
+          e.printStackTrace();
+          return ResponseEntity.internalServerError().body("Error updating user: " + e.getMessage());
       }
   }
 }
