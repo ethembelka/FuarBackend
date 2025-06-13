@@ -20,12 +20,17 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.beans.factory.annotation.Value;
+import jakarta.annotation.PostConstruct;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
 @RestController
 @RequestMapping("/api/v1/users")
@@ -37,6 +42,57 @@ public class UserController {
     private final WorkExperienceService workExperienceService;
     private final SkillService skillService;
     private final PasswordEncoder passwordEncoder;
+
+    @Value("${app.upload.dir:uploads}")
+    private String uploadDir;
+
+    @Value("${app.profile.images.dir:${app.upload.dir}/profiles}")
+    private String profileImagesDir;
+
+    @PostConstruct
+    public void init() {
+        try {
+            // Get project root directory
+            String projectRoot = System.getProperty("user.dir");
+            String projectUploadDir = projectRoot + "/" + uploadDir;
+            String projectProfileImagesDir = projectRoot + "/" + profileImagesDir;
+            
+            // Create all required directories
+            Files.createDirectories(Paths.get(projectUploadDir));
+            Files.createDirectories(Paths.get(projectProfileImagesDir));
+            
+            // Also try to create in alternative locations
+            String[] alternativeDirs = {
+                System.getProperty("java.io.tmpdir") + "/" + uploadDir,
+                System.getProperty("user.home") + "/" + uploadDir,
+                uploadDir
+            };
+            
+            for (String dir : alternativeDirs) {
+                try {
+                    Files.createDirectories(Paths.get(dir));
+                    Files.createDirectories(Paths.get(dir + "/profiles"));
+                    
+                    // Set directory permissions on Unix systems
+                    try {
+                        Process process = Runtime.getRuntime().exec("chmod -R 755 " + dir);
+                        int exitCode = process.waitFor();
+                        if (exitCode == 0) {
+                            System.out.println("Set permissions for directory: " + dir);
+                        }
+                    } catch (Exception e) {
+                        System.out.println("Could not set permissions for " + dir + ": " + e.getMessage());
+                    }
+                } catch (Exception e) {
+                    System.out.println("Could not create directory " + dir + ": " + e.getMessage());
+                }
+            }
+            
+        } catch (IOException e) {
+            System.err.println("Warning: Could not create all upload directories: " + e.getMessage());
+            // Don't throw exception, just log warning
+        }
+    }
 
     /**
      * Get all users
@@ -463,9 +519,11 @@ public class UserController {
    * @param request User creation request
    * @return Created user with UserInfo and other details
    */
-  @PostMapping
+  @PostMapping(consumes = { "multipart/form-data" })
   @PreAuthorize("hasRole('ADMIN')")
-  public ResponseEntity<?> createUser(@Valid @RequestBody CreateUserRequest request) {
+  public ResponseEntity<?> createUser(
+      @RequestPart("userData") @Valid CreateUserRequest request,
+      @RequestPart(value = "file", required = false) MultipartFile file) {
       try {
           // Validate request
           if (request.getEmail() == null || request.getEmail().isEmpty()) {
@@ -483,12 +541,97 @@ public class UserController {
               return ResponseEntity.badRequest().body("Email address is already in use");
           }
 
-          // Create and save User entity
+          // Handle file upload if present
+          String imagePath = null;
+          if (file != null && !file.isEmpty()) {
+              try {
+                  // Get project root directory
+                  String projectRoot = System.getProperty("user.dir");
+                  String projectUploadDir = projectRoot + "/uploads/profiles";
+                  
+                  // Define alternative upload directories as fallbacks
+                  String[] uploadDirs = {
+                      projectUploadDir, // Project directory (primary)
+                      System.getProperty("java.io.tmpdir") + "/uploads/profiles", // Temp directory
+                      System.getProperty("user.home") + "/uploads/profiles", // Home directory
+                      "uploads/profiles" // Relative directory
+                  };
+                  
+                  // Generate unique filename
+                  String originalFilename = file.getOriginalFilename();
+                  String extension = originalFilename != null && originalFilename.contains(".") ? 
+                      originalFilename.substring(originalFilename.lastIndexOf(".")) : ".jpg";
+                  String filename = "profile_" + System.currentTimeMillis() + extension;
+                  
+                  // Try to save file in each directory until successful
+                  File savedFile = null;
+                  String usedDirectory = null;
+                  Exception lastException = null;
+                  
+                  for (String dir : uploadDirs) {
+                      File directory = new File(dir);
+                      
+                      // Create directory if it doesn't exist
+                      if (!directory.exists()) {
+                          try {
+                              boolean created = directory.mkdirs();
+                              if (!created) {
+                                  System.err.println("Failed to create directory: " + directory.getAbsolutePath());
+                                  continue;
+                              }
+                              
+                              // Try to set permissions
+                              try {
+                                  Process process = Runtime.getRuntime().exec("chmod 755 " + directory.getAbsolutePath());
+                                  process.waitFor();
+                              } catch (Exception e) {
+                                  System.out.println("Could not set permissions: " + e.getMessage());
+                              }
+                          } catch (Exception e) {
+                              System.err.println("Error creating directory " + directory.getAbsolutePath() + ": " + e.getMessage());
+                              continue;
+                          }
+                      }
+                      
+                      if (!directory.canWrite()) {
+                          System.err.println("Directory not writable: " + directory.getAbsolutePath());
+                          continue;
+                      }
+                      
+                      File targetFile = new File(directory, filename);
+                      try {
+                          file.transferTo(targetFile);
+                          if (targetFile.exists() && targetFile.length() > 0) {
+                              savedFile = targetFile;
+                              usedDirectory = dir;
+                              break;
+                          }
+                      } catch (Exception e) {
+                          lastException = e;
+                          System.err.println("Error saving to " + targetFile.getAbsolutePath() + ": " + e.getMessage());
+                      }
+                  }
+                  
+                  if (savedFile == null) {
+                      throw new IOException("Failed to save file to any location" + 
+                          (lastException != null ? ": " + lastException.getMessage() : ""));
+                  }
+                  
+                  // Store relative path for URL construction
+                  imagePath = "/uploads/profiles/" + filename;
+              } catch (IOException e) {
+                  return ResponseEntity.internalServerError()
+                      .body("Error uploading profile image: " + e.getMessage());
+              }
+          }
+
+          // Create and save User entity with image path
           User user = User.builder()
               .name(request.getName())
               .email(request.getEmail())
               .password(passwordEncoder.encode(request.getPassword()))
               .role(request.getRole() != null ? request.getRole() : Role.USER)
+              .image(imagePath)
               .build();
 
           User savedUser = userRepository.save(user);
@@ -517,6 +660,7 @@ public class UserController {
               response.put("name", savedUser.getName());
               response.put("email", savedUser.getEmail());
               response.put("role", savedUser.getRole());
+              response.put("image", savedUser.getImage());
               response.put("userInfo", savedUser.getUserInfo());
 
               return ResponseEntity.ok(response);
