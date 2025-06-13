@@ -1,5 +1,6 @@
 package com.fuar.controller;
 
+import com.fuar.dto.CreateUserRequest;
 import com.fuar.model.Role;
 import com.fuar.model.User;
 import com.fuar.model.UserInfo;
@@ -8,6 +9,7 @@ import com.fuar.service.UserInfoService;
 import com.fuar.service.EducationService;
 import com.fuar.service.WorkExperienceService;
 import com.fuar.service.SkillService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -15,12 +17,15 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import org.springframework.security.crypto.password.PasswordEncoder;
+
 import java.io.File;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 @RestController
 @RequestMapping("/api/v1/users")
@@ -31,6 +36,7 @@ public class UserController {
     private final EducationService educationService;
     private final WorkExperienceService workExperienceService;
     private final SkillService skillService;
+    private final PasswordEncoder passwordEncoder;
 
     /**
      * Get all users
@@ -450,5 +456,79 @@ public class UserController {
       e.printStackTrace();
       return ResponseEntity.internalServerError().body("Error deleting profile image: " + e.getMessage());
     }
+  }
+
+  /**
+   * Create a new user - Only accessible by admin users
+   * @param request User creation request
+   * @return Created user with UserInfo and other details
+   */
+  @PostMapping
+  @PreAuthorize("hasRole('ADMIN')")
+  public ResponseEntity<?> createUser(@Valid @RequestBody CreateUserRequest request) {
+      try {
+          // Validate request
+          if (request.getEmail() == null || request.getEmail().isEmpty()) {
+              return ResponseEntity.badRequest().body("Email is required");
+          }
+          if (request.getPassword() == null || request.getPassword().isEmpty()) {
+              return ResponseEntity.badRequest().body("Password is required");
+          }
+          if (request.getName() == null || request.getName().isEmpty()) {
+              return ResponseEntity.badRequest().body("Name is required");
+          }
+
+          // Check for duplicate email
+          if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+              return ResponseEntity.badRequest().body("Email address is already in use");
+          }
+
+          // Create and save User entity
+          User user = User.builder()
+              .name(request.getName())
+              .email(request.getEmail())
+              .password(passwordEncoder.encode(request.getPassword()))
+              .role(request.getRole() != null ? request.getRole() : Role.USER)
+              .build();
+
+          User savedUser = userRepository.save(user);
+
+          // Create and link UserInfo
+          try {
+              boolean created = userInfoService.createUserInfoIfNotExists(savedUser.getId());
+              if (!created) {
+                  throw new RuntimeException("Failed to create UserInfo for user");
+              }
+
+              // Update UserInfo if additional details were provided
+              if (request.getUserInfo() != null) {
+                  UserInfo updatedInfo = userInfoService.updateUserInfoFields(savedUser.getId(), request.getUserInfo());
+                  if (updatedInfo != null) {
+                      savedUser = userRepository.findById(savedUser.getId()).orElse(savedUser);
+                  }
+              }
+
+              // Remove sensitive information before returning
+              savedUser.setPassword(null);
+
+              // Create response with basic user info and UserInfo details
+              Map<String, Object> response = new HashMap<>();
+              response.put("id", savedUser.getId());
+              response.put("name", savedUser.getName());
+              response.put("email", savedUser.getEmail());
+              response.put("role", savedUser.getRole());
+              response.put("userInfo", savedUser.getUserInfo());
+
+              return ResponseEntity.ok(response);
+
+          } catch (Exception e) {
+              // If UserInfo creation fails, delete the user and return error
+              userRepository.delete(savedUser);
+              throw new RuntimeException("Failed to create user profile: " + e.getMessage());
+          }
+      } catch (Exception e) {
+          return ResponseEntity.internalServerError()
+              .body("Error creating user: " + e.getMessage());
+      }
   }
 }
