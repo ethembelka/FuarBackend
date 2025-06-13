@@ -5,10 +5,7 @@ import com.fuar.model.Role;
 import com.fuar.model.User;
 import com.fuar.model.UserInfo;
 import com.fuar.repository.UserRepository;
-import com.fuar.service.UserInfoService;
-import com.fuar.service.EducationService;
-import com.fuar.service.WorkExperienceService;
-import com.fuar.service.SkillService;
+import com.fuar.service.*;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -40,6 +37,7 @@ public class UserController {
     private final UserInfoService userInfoService;
     private final EducationService educationService;
     private final WorkExperienceService workExperienceService;
+    private final EventService eventService;
     private final SkillService skillService;
     private final PasswordEncoder passwordEncoder;
 
@@ -673,6 +671,97 @@ public class UserController {
       } catch (Exception e) {
           return ResponseEntity.internalServerError()
               .body("Error creating user: " + e.getMessage());
+      }
+  }
+
+  /**
+   * Delete a user and all associated data
+   * Only accessible by admin users
+   * @param userId ID of the user to delete
+   * @return Empty response if successful
+   */
+  @DeleteMapping("/{userId}")
+  @PreAuthorize("hasRole('ADMIN')")
+  public ResponseEntity<?> deleteUser(@PathVariable Long userId) {
+      try {
+          // First check if user exists
+          User user = userRepository.findById(userId)
+                  .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
+
+          // Get user info (if exists)
+          Optional<UserInfo> userInfoOpt = Optional.empty();
+          try {
+              userInfoOpt = Optional.ofNullable(userInfoService.getUserInfo(userId));
+          } catch (RuntimeException e) {
+              // UserInfo not found, continue with deletion
+              System.out.println("No UserInfo found for user " + userId);
+          }
+
+          if (userInfoOpt.isPresent()) {
+              UserInfo userInfo = userInfoOpt.get();
+              Long userInfoId = userInfo.getId();
+
+              // Delete all education records
+              user.getUserInfo().getEducations().forEach(education -> 
+                  educationService.deleteEducation(education.getId()));
+
+              // Delete all work experience records
+              user.getUserInfo().getWorkExperiences().forEach(workExperience -> 
+                  workExperienceService.deleteWorkExperience(workExperience.getId()));
+
+              // Clear skills (but don't delete the skills themselves)
+              user.getUserInfo().getSkills().clear();
+              userRepository.save(user);
+          }
+
+          // Clean up event relationships
+          try {
+              // Remove user from all events where they are a speaker
+              eventService.removeUserFromAllEvents(userId);
+              
+              // Remove user from all events where they are an attendee
+              eventService.unregisterFromAllEvents(userId);
+          } catch (Exception e) {
+              System.err.println("Error cleaning up event relationships: " + e.getMessage());
+              // Continue with deletion even if event cleanup fails
+          }
+
+          // Delete user (this will cascade delete UserInfo and related records)
+          userRepository.delete(user);
+
+          // Clean up profile image if exists
+          String imagePath = user.getImage();
+          if (imagePath != null && !imagePath.isEmpty()) {
+              // Define possible upload directories
+              String[] uploadDirs = {
+                  System.getProperty("user.dir") + "/uploads/profiles/",
+                  System.getProperty("java.io.tmpdir") + "/uploads/profiles/",
+                  System.getProperty("user.home") + "/uploads/profiles/",
+                  "uploads/profiles/"
+              };
+
+              if (imagePath.contains("/")) {
+                  String filename = imagePath.substring(imagePath.lastIndexOf("/") + 1);
+                  for (String dir : uploadDirs) {
+                      File imageFile = new File(dir, filename);
+                      if (imageFile.exists() && imageFile.isFile()) {
+                          boolean deleted = imageFile.delete();
+                          if (deleted) {
+                              System.out.println("Successfully deleted profile image: " + imageFile.getAbsolutePath());
+                          } else {
+                              System.err.println("Failed to delete profile image: " + imageFile.getAbsolutePath());
+                          }
+                      }
+                  }
+              }
+          }
+
+          return ResponseEntity.ok().build();
+      } catch (Exception e) {
+          System.err.println("Error deleting user: " + e.getMessage());
+          e.printStackTrace();
+          return ResponseEntity.internalServerError()
+                  .body("Error deleting user: " + e.getMessage());
       }
   }
 }

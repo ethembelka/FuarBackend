@@ -159,4 +159,42 @@ public class EventService {
         
         return events;
     }
+
+    /**
+     * Remove a user from all events where they are a speaker
+     * @param userId User ID to remove
+     */
+    @Transactional
+    public void removeUserFromAllEvents(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+
+        // Get all events where user is a speaker
+        List<Event> events = eventRepository.findBySpeakersId(userId);
+        
+        // Remove user from speakers list in each event
+        for (Event event : events) {
+            event.getSpeakers().remove(user);
+            eventRepository.save(event);
+        }
+    }
+
+    /**
+     * Remove a user from all events where they are an attendee
+     * @param userId User ID to remove
+     */
+    @Transactional
+    public void unregisterFromAllEvents(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+
+        // Get all events where user is an attendee
+        List<Event> events = eventRepository.findEventsByAttendeeId(userId);
+        
+        // Remove user from attendees list in each event
+        for (Event event : events) {
+            event.getAttendees().remove(user);
+            eventRepository.save(event);
+        }
+    }
 }
