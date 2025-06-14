@@ -54,6 +54,11 @@ public class PublicationService {
         publicationRepository.deleteById(id);
     }
 
+    public Publication getPublicationById(Long id) {
+        return publicationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Publication not found with id: " + id));
+    }
+
     public List<Publication> searchPublications(String keyword) {
         return publicationRepository.searchByKeyword(keyword);
     }

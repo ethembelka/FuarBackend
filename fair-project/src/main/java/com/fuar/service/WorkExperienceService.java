@@ -55,6 +55,11 @@ public class WorkExperienceService {
         workExperienceRepository.deleteById(id);
     }
 
+    public WorkExperience getWorkExperienceById(Long id) {
+        return workExperienceRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Work experience not found with id: " + id));
+    }
+
     public List<WorkExperience> searchWorkExperiences(String keyword) {
         return workExperienceRepository.searchByKeyword(keyword);
     }

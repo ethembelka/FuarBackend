@@ -60,6 +60,11 @@ public class EducationService {
         educationRepository.deleteById(id);
     }
 
+    public Education getEducationById(Long id) {
+        return educationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Education not found with id: " + id));
+    }
+
     public List<Education> searchEducation(String keyword) {
         return educationRepository.searchByKeyword(keyword);
     }

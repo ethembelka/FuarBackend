@@ -35,7 +35,7 @@ public class UserInfoController {
     }
 
     @PutMapping("/{userId}")
-    @PreAuthorize("#userId == authentication.principal.id")
+    @PreAuthorize("#userId == authentication.principal.id or hasRole('ADMIN')")
     public ResponseEntity<UserInfo> updateUserInfo(
             @PathVariable Long userId,
             @RequestBody UserInfoDTO userInfoDTO
@@ -80,7 +80,7 @@ public class UserInfoController {
     }
 
     @PostMapping("/{userId}/skills/{skillId}")
-    @PreAuthorize("#userId == authentication.principal.id")
+    @PreAuthorize("#userId == authentication.principal.id or hasRole('ADMIN')")
     public ResponseEntity<UserInfo> addSkill(
             @PathVariable Long userId,
             @PathVariable Long skillId
@@ -89,7 +89,7 @@ public class UserInfoController {
     }
 
     @DeleteMapping("/{userId}/skills/{skillId}")
-    @PreAuthorize("#userId == authentication.principal.id")
+    @PreAuthorize("#userId == authentication.principal.id or hasRole('ADMIN')")
     public ResponseEntity<UserInfo> removeSkill(
             @PathVariable Long userId,
             @PathVariable Long skillId

@@ -22,7 +22,7 @@ public class EducationController {
     }
 
     @PostMapping("/user/{userInfoId}")
-    @PreAuthorize("@userInfoService.getUserInfo(#userInfoId).user.id == authentication.principal.id")
+    @PreAuthorize("@userInfoService.getUserInfo(#userInfoId).user.id == authentication.principal.id or hasRole('ADMIN')")
     public ResponseEntity<Education> addEducation(
             @PathVariable Long userInfoId,
             @RequestBody EducationDTO educationDTO
@@ -41,7 +41,7 @@ public class EducationController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("@educationService.getUserEducation(#id).get(0).userInfo.user.id == authentication.principal.id")
+    @PreAuthorize("@educationService.getEducationById(#id).userInfo.user.id == authentication.principal.id or hasRole('ADMIN')")
     public ResponseEntity<Education> updateEducation(
             @PathVariable Long id,
             @RequestBody EducationDTO educationDTO
@@ -60,7 +60,7 @@ public class EducationController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("@educationService.getUserEducation(#id).get(0).userInfo.user.id == authentication.principal.id")
+    @PreAuthorize("@educationService.getEducationById(#id).userInfo.user.id == authentication.principal.id or hasRole('ADMIN')")
     public ResponseEntity<Void> deleteEducation(@PathVariable Long id) {
         educationService.deleteEducation(id);
         return ResponseEntity.ok().build();

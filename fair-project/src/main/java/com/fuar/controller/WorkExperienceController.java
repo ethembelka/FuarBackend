@@ -22,7 +22,7 @@ public class WorkExperienceController {
     }
 
     @PostMapping("/user/{userInfoId}")
-    @PreAuthorize("@userInfoService.getUserInfo(#userInfoId).user.id == authentication.principal.id")
+    @PreAuthorize("@userInfoService.getUserInfo(#userInfoId).user.id == authentication.principal.id or hasRole('ADMIN')")
     public ResponseEntity<WorkExperience> addWorkExperience(
             @PathVariable Long userInfoId,
             @RequestBody WorkExperienceDTO workExperienceDTO
@@ -42,7 +42,7 @@ public class WorkExperienceController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("@workExperienceService.getUserWorkExperiences(#id).get(0).userInfo.user.id == authentication.principal.id")
+    @PreAuthorize("@workExperienceService.getWorkExperienceById(#id).userInfo.user.id == authentication.principal.id or hasRole('ADMIN')")
     public ResponseEntity<WorkExperience> updateWorkExperience(
             @PathVariable Long id,
             @RequestBody WorkExperienceDTO workExperienceDTO
@@ -62,7 +62,7 @@ public class WorkExperienceController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("@workExperienceService.getUserWorkExperiences(#id).get(0).userInfo.user.id == authentication.principal.id")
+    @PreAuthorize("@workExperienceService.getWorkExperienceById(#id).userInfo.user.id == authentication.principal.id or hasRole('ADMIN')")
     public ResponseEntity<Void> deleteWorkExperience(@PathVariable Long id) {
         workExperienceService.deleteWorkExperience(id);
         return ResponseEntity.ok().build();

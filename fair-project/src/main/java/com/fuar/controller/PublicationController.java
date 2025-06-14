@@ -23,7 +23,7 @@ public class PublicationController {
     }
 
     @PostMapping("/user/{userInfoId}")
-    @PreAuthorize("@userInfoService.getUserInfo(#userInfoId).user.id == authentication.principal.id")
+    @PreAuthorize("@userInfoService.getUserInfo(#userInfoId).user.id == authentication.principal.id or hasRole('ADMIN')")
     public ResponseEntity<Publication> addPublication(
             @PathVariable Long userInfoId,
             @RequestBody PublicationDTO publicationDTO
@@ -43,7 +43,7 @@ public class PublicationController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("@publicationService.getUserPublications(#id).get(0).userInfo.user.id == authentication.principal.id")
+    @PreAuthorize("@publicationService.getPublicationById(#id).userInfo.user.id == authentication.principal.id or hasRole('ADMIN')")
     public ResponseEntity<Publication> updatePublication(
             @PathVariable Long id,
             @RequestBody PublicationDTO publicationDTO
@@ -63,7 +63,7 @@ public class PublicationController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("@publicationService.getUserPublications(#id).get(0).userInfo.user.id == authentication.principal.id")
+    @PreAuthorize("@publicationService.getPublicationById(#id).userInfo.user.id == authentication.principal.id or hasRole('ADMIN')")
     public ResponseEntity<Void> deletePublication(@PathVariable Long id) {
         publicationService.deletePublication(id);
         return ResponseEntity.ok().build();
