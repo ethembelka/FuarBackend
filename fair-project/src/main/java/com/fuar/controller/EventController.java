@@ -2,6 +2,7 @@ package com.fuar.controller;
 
 import com.fuar.dto.EventDTO;
 import com.fuar.dto.EventResponseDTO;
+import com.fuar.dto.EventUpdateDTO;
 import com.fuar.mapper.EventMapper;
 import com.fuar.model.Event;
 import com.fuar.service.EventService;
@@ -237,16 +238,21 @@ public class EventController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<EventResponseDTO> updateEvent(
             @PathVariable @NotNull Long id,
-            @RequestBody @Valid EventDTO eventDTO
+            @RequestBody @Valid EventUpdateDTO eventUpdateDTO
     ) {
+        // Ensure the ID in the path matches the ID in the DTO
+        if (!id.equals(eventUpdateDTO.getId())) {
+            throw new IllegalArgumentException("ID in path must match ID in request body");
+        }
+        
         Event event = new Event();
-        event.setTitle(eventDTO.getTitle());
-        event.setDescription(eventDTO.getDescription());
-        event.setLocation(eventDTO.getLocation());
-        event.setStartDate(eventDTO.getStartDate());
-        event.setEndDate(eventDTO.getEndDate());
-        event.setCapacity(eventDTO.getCapacity());
-        event.setImage(eventDTO.getImage());
+        event.setTitle(eventUpdateDTO.getTitle());
+        event.setDescription(eventUpdateDTO.getDescription());
+        event.setLocation(eventUpdateDTO.getLocation());
+        event.setStartDate(eventUpdateDTO.getStartDate());
+        event.setEndDate(eventUpdateDTO.getEndDate());
+        event.setCapacity(eventUpdateDTO.getCapacity());
+        event.setImage(eventUpdateDTO.getImage());
 
         Event updatedEvent = eventService.updateEvent(id, event);
         return ResponseEntity.ok(eventMapper.toResponseDTO(updatedEvent));

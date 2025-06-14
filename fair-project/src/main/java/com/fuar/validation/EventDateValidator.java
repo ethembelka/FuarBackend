@@ -1,16 +1,26 @@
 package com.fuar.validation;
 
-import com.fuar.dto.EventDTO;
+import com.fuar.dto.EventDateContainer;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 
-public class EventDateValidator implements ConstraintValidator<ValidEventDate, EventDTO> {
+public class EventDateValidator implements ConstraintValidator<ValidEventDate, EventDateContainer> {
 
     @Override
-    public boolean isValid(EventDTO eventDTO, ConstraintValidatorContext context) {
-        if (eventDTO.getStartDate() == null || eventDTO.getEndDate() == null) {
+    public boolean isValid(EventDateContainer eventDateContainer, ConstraintValidatorContext context) {
+        if (eventDateContainer.getStartDate() == null || eventDateContainer.getEndDate() == null) {
             return true; // Let @NotNull handle null values
         }
-        return eventDTO.getEndDate().isAfter(eventDTO.getStartDate());
+        
+        // Always enforce that end date must be after start date
+        if (!eventDateContainer.getEndDate().isAfter(eventDateContainer.getStartDate())) {
+            context.disableDefaultConstraintViolation();
+            context.buildConstraintViolationWithTemplate("End date must be after start date")
+                  .addPropertyNode("endDate")
+                  .addConstraintViolation();
+            return false;
+        }
+        
+        return true;
     }
 }

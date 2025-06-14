@@ -1,6 +1,5 @@
 package com.fuar.dto;
 
-import com.fuar.validation.CreateEventDateValidation;
 import com.fuar.validation.ValidEventDate;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -17,8 +16,9 @@ import java.util.Set;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@CreateEventDateValidation
-public class EventDTO implements EventDateContainer {
+@ValidEventDate
+public class EventUpdateDTO implements EventDateContainer {
+    @NotNull(message = "ID is required for updates")
     private Long id;
 
     @NotBlank(message = "Title is required")
