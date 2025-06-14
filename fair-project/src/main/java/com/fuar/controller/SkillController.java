@@ -102,4 +102,14 @@ public class SkillController {
 
         return ResponseEntity.ok(skill);
     }
+
+    @DeleteMapping("/user/{userId}/{skillId}")
+    @PreAuthorize("#userId == authentication.principal.id or hasRole('ADMIN')")
+    public ResponseEntity<Void> removeSkillFromUser(
+            @PathVariable Long userId,
+            @PathVariable Long skillId
+    ) {
+        userInfoService.removeSkillFromUserInfo(userId, skillId);
+        return ResponseEntity.ok().build();
+    }
 }
