@@ -1,5 +1,6 @@
 package com.fuar.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fuar.dto.CreateUserRequest;
 import com.fuar.dto.UpdateUserRequest;
 import com.fuar.model.Role;
@@ -9,26 +10,30 @@ import com.fuar.repository.UserRepository;
 import com.fuar.service.*;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import org.springframework.security.crypto.password.PasswordEncoder;
-
+import jakarta.annotation.PostConstruct;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.beans.factory.annotation.Value;
-import jakarta.annotation.PostConstruct;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 
 @RestController
 @RequestMapping("/api/v1/users")
@@ -767,12 +772,114 @@ public class UserController {
   }
 
   /**
-   * Update a user and their related information
+   * Update a user and their related information with file upload support
    * @param userId User ID to update
-   * @param updateUserRequest Updated user information
+   * @param userData User data as JSON string
+   * @param file Optional profile image file
    * @return Updated user
    */
-  @PutMapping("/{userId}")
+  @PutMapping(value = "/{userId}", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
+  @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.id")
+  public ResponseEntity<?> updateUserWithImage(
+          @PathVariable Long userId,
+          @RequestPart(value = "userData", required = true) String userDataJson,
+          @RequestPart(value = "file", required = false) MultipartFile file) {
+      try {
+          // Parse user data from JSON
+          ObjectMapper objectMapper = new ObjectMapper();
+          // Configure Jackson to ignore unknown properties
+          objectMapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+          UpdateUserRequest updateUserRequest = objectMapper.readValue(userDataJson, UpdateUserRequest.class);
+          
+          // Check if user exists
+          User user = userRepository.findById(userId)
+                  .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
+
+          // Process and save the image if provided
+          if (file != null && !file.isEmpty()) {
+              try {
+                  String fileName = StringUtils.cleanPath(file.getOriginalFilename());
+                  String uniqueFileName = System.currentTimeMillis() + "_" + fileName;
+                  
+                  // Save the file
+                  Path uploadPath = Paths.get(System.getProperty("user.dir"), profileImagesDir);
+                  if (!Files.exists(uploadPath)) {
+                      Files.createDirectories(uploadPath);
+                  }
+                  
+                  Path filePath = uploadPath.resolve(uniqueFileName);
+                  Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+                  
+                  // Update the user's image path
+                  user.setImage(uniqueFileName);
+                  System.out.println("Updated user image: " + uniqueFileName);
+              } catch (IOException e) {
+                  e.printStackTrace();
+                  return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                          .body("Could not upload the image: " + e.getMessage());
+              }
+          }
+
+          // Update basic user information
+          if (updateUserRequest.getName() != null) {
+              user.setName(updateUserRequest.getName());
+          }
+          
+          // Only admins can change roles
+          Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+          boolean isAdmin = authentication.getAuthorities().stream()
+                  .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+          
+          if (isAdmin && updateUserRequest.getRole() != null) {
+              user.setRole(updateUserRequest.getRole());
+          }
+          
+          // Update email if provided and different from current
+          if (updateUserRequest.getEmail() != null && !updateUserRequest.getEmail().equals(user.getEmail())) {
+              // Check if email is already in use
+              if (userRepository.findByEmail(updateUserRequest.getEmail()).isPresent()) {
+                  return ResponseEntity.badRequest().body("Email is already in use");
+              }
+              user.setEmail(updateUserRequest.getEmail());
+          }
+          
+          // Update password if provided
+          if (updateUserRequest.getPassword() != null && !updateUserRequest.getPassword().isEmpty()) {
+              user.setPassword(passwordEncoder.encode(updateUserRequest.getPassword()));
+          }
+          
+          // Save updated user
+          User updatedUser = userRepository.save(user);
+          
+          // Update UserInfo if provided
+          if (updateUserRequest.getUserInfo() != null) {
+              try {
+                  // Try to get or create UserInfo
+                  userInfoService.createUserInfoIfNotExists(userId);
+                  
+                  // Update UserInfo fields
+                  userInfoService.updateUserInfoFields(userId, updateUserRequest.getUserInfo());
+              } catch (Exception e) {
+                  System.err.println("Error updating UserInfo: " + e.getMessage());
+                  e.printStackTrace();
+                  // Continue even if UserInfo update fails
+              }
+          }
+          
+          // Get the updated user with refreshed relations
+          User refreshedUser = userRepository.findById(userId).orElse(updatedUser);
+          refreshedUser.setPassword(null); // Don't return password in response
+          
+          return ResponseEntity.ok(refreshedUser);
+      } catch (Exception e) {
+          System.err.println("Error updating user with image: " + e.getMessage());
+          e.printStackTrace();
+          return ResponseEntity.internalServerError().body("Error updating user: " + e.getMessage());
+      }
+  }
+  
+  // Keep the original JSON-based update method for backward compatibility
+  @PutMapping(value = "/{userId}", consumes = MediaType.APPLICATION_JSON_VALUE)
   @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.id")
   public ResponseEntity<?> updateUser(@PathVariable Long userId, @RequestBody @Valid UpdateUserRequest updateUserRequest) {
       try {
