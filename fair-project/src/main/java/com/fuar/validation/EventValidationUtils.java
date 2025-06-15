@@ -14,8 +14,7 @@ public class EventValidationUtils {
 
     /**
      * Validates if an event is being created or updated
-     * For creating new events, dates must be in the future
-     * For updating events, only validate that end date is after start date
+     * We only validate that end date is after start date
      *
      * @param eventDTO The event DTO to validate
      * @return true if validation passes, false otherwise
@@ -30,14 +29,8 @@ public class EventValidationUtils {
             return false;
         }
 
-        // If this is an update (ID exists), we don't enforce future dates
-        if (eventDTO.getId() != null) {
-            return true;
-        }
-
-        // For new events, both dates must be in the future
-        LocalDateTime now = LocalDateTime.now();
-        return eventDTO.getStartDate().isAfter(now) && eventDTO.getEndDate().isAfter(now);
+        // No date restrictions for new or updated events - only validate end date is after start date
+        return true;
     }
     
     /**
