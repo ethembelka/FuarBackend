@@ -42,6 +42,8 @@ public class SecurityConfig {
                     "/api/v1/auth/**",  // Other auth endpoints
                     "/api/v1/events/speaker/**",  // Konuşmacı etkinlikleri endpoint'i
                     "/ws/**",
+                    "/api/v1/ws/**",  // Also allow /api/v1/ws endpoints for WebSocket
+                    "/info/**",  // SockJS needs this for info frames
                     "/topic/**",
                     "/queue/**",
                     "/app/**",
@@ -78,7 +80,8 @@ public class SecurityConfig {
                 // Protected endpoints that require authentication
                 .requestMatchers(
                     "/api/v1/speakers/**",
-                    "/api/v1/events/**"
+                    "/api/v1/events/**",
+                    "/api/v1/conversations/**"
                 ).authenticated()
                 .anyRequest().authenticated();
             })
@@ -98,7 +101,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000", "http://localhost:3001"));
+        configuration.setAllowedOriginPatterns(Arrays.asList("*"));  // Allow all origins for WebSocket connections
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(Arrays.asList(
             "Content-Type",

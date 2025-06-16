@@ -16,7 +16,7 @@ spring:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
   websocket:
-    allowed-origins: "*"
+    allowed-origins: "http://localhost:3000,http://localhost:3001"
     endpoint: /ws
     destination-prefixes: /app
     broker-prefix: /topic, /queue
