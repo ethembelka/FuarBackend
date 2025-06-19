@@ -16,9 +16,9 @@ import java.util.List;
 public class EducationController {
     private final EducationService educationService;
 
-    @GetMapping("/user/{userInfoId}")
-    public ResponseEntity<List<EducationDTO>> getUserEducation(@PathVariable Long userInfoId) {
-        return ResponseEntity.ok(educationService.getUserEducation(userInfoId));
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<List<EducationDTO>> getUserEducation(@PathVariable Long userId) {
+        return ResponseEntity.ok(educationService.getUserEducation(userId));
     }
 
     @PostMapping("/user/{userInfoId}")
