@@ -810,9 +810,10 @@ public class UserController {
                   Path filePath = uploadPath.resolve(uniqueFileName);
                   Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
                   
-                  // Update the user's image path
-                  user.setImage(uniqueFileName);
-                  System.out.println("Updated user image: " + uniqueFileName);
+                  // Update the user's image path with full URL format
+                  String imageUrl = "/uploads/profiles/" + uniqueFileName;
+                  user.setImage(imageUrl);
+                  System.out.println("Updated user image: " + imageUrl);
               } catch (IOException e) {
                   e.printStackTrace();
                   return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -947,6 +948,151 @@ public class UserController {
           System.err.println("Error updating user: " + e.getMessage());
           e.printStackTrace();
           return ResponseEntity.internalServerError().body("Error updating user: " + e.getMessage());
+      }
+  }
+  
+  /**
+   * Upload profile image for current user
+   */
+  @PostMapping("/me/profile/image")
+  public ResponseEntity<?> uploadProfileImage(@RequestPart("file") MultipartFile file) {
+      try {
+          // Get current authenticated user
+          Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+          String userEmail = authentication.getName();
+          
+          User user = userRepository.findByEmail(userEmail)
+                  .orElseThrow(() -> new RuntimeException("User not found"));
+
+          if (file.isEmpty()) {
+              return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Please select a file to upload"));
+          }
+
+          // Validate file type
+          String contentType = file.getContentType();
+          if (contentType == null || !contentType.startsWith("image/")) {
+              return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Please upload a valid image file"));
+          }
+
+          // Validate file size (max 5MB)
+          if (file.getSize() > 5 * 1024 * 1024) {
+              return ResponseEntity.badRequest().body(Map.of("success", false, "message", "File size must be less than 5MB"));
+          }
+
+          try {
+              String fileName = StringUtils.cleanPath(file.getOriginalFilename());
+              String fileExtension = "";
+              int dotIndex = fileName.lastIndexOf('.');
+              if (dotIndex > 0) {
+                  fileExtension = fileName.substring(dotIndex);
+              }
+              
+              String uniqueFileName = "profile_" + user.getId() + "_" + System.currentTimeMillis() + fileExtension;
+              
+              // Create upload directory if it doesn't exist
+              Path uploadPath = Paths.get(System.getProperty("user.dir"), profileImagesDir);
+              if (!Files.exists(uploadPath)) {
+                  Files.createDirectories(uploadPath);
+              }
+              
+              // Delete old profile image if exists
+              if (user.getImage() != null && !user.getImage().isEmpty()) {
+                  try {
+                      // Extract just the filename from the URL path
+                      String oldFileName = user.getImage();
+                      if (oldFileName.startsWith("/uploads/profiles/")) {
+                          oldFileName = oldFileName.substring("/uploads/profiles/".length());
+                      }
+                      Path oldFilePath = uploadPath.resolve(oldFileName);
+                      Files.deleteIfExists(oldFilePath);
+                  } catch (Exception e) {
+                      System.out.println("Could not delete old profile image: " + e.getMessage());
+                  }
+              }
+              
+              // Save new image
+              Path filePath = uploadPath.resolve(uniqueFileName);
+              Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+              
+              // Update user's image path with full URL format
+              String imageUrl = "/uploads/profiles/" + uniqueFileName;
+              user.setImage(imageUrl);
+              userRepository.save(user);
+              
+              System.out.println("Profile image uploaded successfully: " + imageUrl);
+              
+              return ResponseEntity.ok(Map.of(
+                  "success", true, 
+                  "message", "Profile image uploaded successfully",
+                  "imagePath", imageUrl
+              ));
+              
+          } catch (IOException e) {
+              e.printStackTrace();
+              return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                      .body(Map.of("success", false, "message", "Could not upload the image: " + e.getMessage()));
+          }
+          
+      } catch (Exception e) {
+          System.err.println("Error uploading profile image: " + e.getMessage());
+          e.printStackTrace();
+          return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                  .body(Map.of("success", false, "message", "Error uploading profile image: " + e.getMessage()));
+      }
+  }
+
+  /**
+   * Delete profile image for current user
+   */
+  @DeleteMapping("/me/profile/image")
+  public ResponseEntity<?> deleteProfileImage() {
+      try {
+          // Get current authenticated user
+          Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+          String userEmail = authentication.getName();
+          
+          User user = userRepository.findByEmail(userEmail)
+                  .orElseThrow(() -> new RuntimeException("User not found"));
+
+          if (user.getImage() == null || user.getImage().isEmpty()) {
+              return ResponseEntity.ok(Map.of("success", true, "message", "No profile image to delete"));
+          }
+
+          try {
+              // Delete the image file
+              Path uploadPath = Paths.get(System.getProperty("user.dir"), profileImagesDir);
+              
+              // Extract just the filename from the URL path
+              String fileName = user.getImage();
+              if (fileName.startsWith("/uploads/profiles/")) {
+                  fileName = fileName.substring("/uploads/profiles/".length());
+              }
+              
+              Path filePath = uploadPath.resolve(fileName);
+              Files.deleteIfExists(filePath);
+              
+              // Update user's image path to null
+              user.setImage(null);
+              userRepository.save(user);
+              
+              System.out.println("Profile image deleted successfully for user: " + user.getId());
+              
+              return ResponseEntity.ok(Map.of(
+                  "success", true, 
+                  "message", "Profile image deleted successfully"
+              ));
+              
+          } catch (IOException e) {
+              e.printStackTrace();
+              return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                      .body(Map.of("success", false, "message", "Could not delete the image: " + e.getMessage()));
+          }
+          
+      } catch (Exception e) {
+          System.err.println("Error deleting profile image: " + e.getMessage());
+          e.printStackTrace();
+          return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                  .body(Map.of("success", false, "message", "Error deleting profile image: " + e.getMessage()));
       }
   }
 }
