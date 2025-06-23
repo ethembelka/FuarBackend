@@ -41,13 +41,36 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         final String authHeader = request.getHeader("Authorization");
         final String jwt;
         final String userEmail;
+        System.out.println("JWT Filter - Request URL: " + request.getRequestURL()); // Debug log
+        System.out.println("JWT Filter - Auth header: " + (authHeader != null ? "Bearer ***" : "null")); // Debug log
+        
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            System.out.println("JWT Filter - No valid auth header, continuing without authentication"); // Debug log
             filterChain.doFilter(request, response);
             return;
         }
         jwt = authHeader.substring(7);
-        userEmail = jwtService.extractUsername(jwt);
-        System.out.println("JWT Filter - Extracted email: " + userEmail); // Debug log
+        System.out.println("JWT Filter - Token length: " + jwt.length()); // Debug log
+        System.out.println("JWT Filter - Token starts with: " + jwt.substring(0, Math.min(20, jwt.length()))); // Debug log
+        
+        try {
+            userEmail = jwtService.extractUsername(jwt);
+            System.out.println("JWT Filter - Extracted email: " + userEmail); // Debug log
+            
+            // Additional debugging to check JWT structure
+            try {
+                String payload = new String(java.util.Base64.getDecoder().decode(jwt.split("\\.")[1]));
+                System.out.println("JWT Filter - Token payload: " + payload); // Debug log
+            } catch (Exception e) {
+                System.out.println("JWT Filter - Could not decode payload: " + e.getMessage());
+            }
+            
+        } catch (Exception e) {
+            System.err.println("JWT Filter - Error extracting email from token: " + e.getMessage());
+            e.printStackTrace();
+            filterChain.doFilter(request, response);
+            return;
+        }
 
         if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             try {

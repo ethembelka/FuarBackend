@@ -27,7 +27,15 @@ public class JwtService {
     private long refreshExpiration;
 
     public String extractUsername(String token) {
-        return extractClaim(token, Claims::getSubject);
+        try {
+            String username = extractClaim(token, Claims::getSubject);
+            System.out.println("JwtService - Extracted username from token: " + username);
+            return username;
+        } catch (Exception e) {
+            System.err.println("JwtService - Error extracting username: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
+        }
     }
 
     public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
@@ -80,12 +88,23 @@ public class JwtService {
     }
 
     private Claims extractAllClaims(String token) {
-        return Jwts
+        try {
+            System.out.println("JwtService - Extracting claims from token with length: " + token.length());
+            Claims claims = Jwts
                 .parserBuilder()
                 .setSigningKey(getSignInKey())
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
+            System.out.println("JwtService - Successfully extracted claims: " + claims);
+            System.out.println("JwtService - Subject (email): " + claims.getSubject());
+            System.out.println("JwtService - Claims: " + claims);
+            return claims;
+        } catch (Exception e) {
+            System.err.println("JwtService - Error extracting claims: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
+        }
     }
 
     private Key getSignInKey() {

@@ -39,7 +39,7 @@ public class SecurityConfig {
                 auth.requestMatchers(
                     "/api/v1/auth/register",  // Explicitly whitelist the register endpoint
                     "/api/v1/auth/authenticate",  // Explicitly whitelist the authenticate endpoint
-                    "/api/v1/auth/**",  // Other auth endpoints
+                    "/api/v1/auth/logout",  // Logout endpoint
                     "/api/v1/events/speaker/**",  // Konuşmacı etkinlikleri endpoint'i
                     "/ws/**",
                     "/api/v1/ws/**",  // Also allow /api/v1/ws endpoints for WebSocket
@@ -79,6 +79,7 @@ public class SecurityConfig {
                 ).permitAll()
                 // Protected endpoints that require authentication
                 .requestMatchers(
+                    "/api/v1/auth/current-user",  // Current user endpoint requires authentication
                     "/api/v1/speakers/**",
                     "/api/v1/events/**",
                     "/api/v1/conversations/**"

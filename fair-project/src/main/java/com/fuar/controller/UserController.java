@@ -191,12 +191,20 @@ public class UserController {
     try {
         // Get the authenticated user from security context
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        System.out.println("UserController - Authentication object: " + authentication);
+        System.out.println("UserController - Authentication class: " + (authentication != null ? authentication.getClass().getSimpleName() : "null"));
+        System.out.println("UserController - Is authenticated: " + (authentication != null ? authentication.isAuthenticated() : "null"));
+        System.out.println("UserController - Principal: " + (authentication != null ? authentication.getPrincipal() : "null"));
+        System.out.println("UserController - Principal class: " + (authentication != null && authentication.getPrincipal() != null ? authentication.getPrincipal().getClass().getSimpleName() : "null"));
+        
         if (authentication == null || !authentication.isAuthenticated()) {
+            System.out.println("UserController - Authentication failed, returning 401");
             return ResponseEntity.status(401).body("User not authenticated");
         }
         
         // Get user email from authentication
         String email = authentication.getName();
+        System.out.println("UserController - Authenticated email: " + email);
         Optional<User> userOpt = userRepository.findByEmail(email);
         
         if (userOpt.isEmpty()) {
