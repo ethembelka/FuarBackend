@@ -75,12 +75,19 @@ public class SecurityConfig {
                     "/api/v1/education/user/*",
                     "/api/v1/work-experience/user/*",
                     "/api/v1/publications/user/*",
+                    "/api/v1/skills",
+                    "/api/v1/skills/user/*",
+                    "/api/v1/skills/search",
+                    "/api/v1/skills/popular",
                     "/uploads/**"  // Allow access to uploaded files
                 ).permitAll()
                 // Protected endpoints that require authentication
                 .requestMatchers(
                     "/api/v1/auth/current-user",  // Current user endpoint requires authentication
                     "/api/v1/education/**",  // Education management endpoints
+                    "/api/v1/work-experience/**",  // Work experience management endpoints
+                    "/api/v1/publications/**",  // Publications management endpoints
+                    "/api/v1/skills/user/**",  // User skill management endpoints
                     "/api/v1/speakers/**",
                     "/api/v1/events/**",
                     "/api/v1/conversations/**"

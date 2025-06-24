@@ -228,7 +228,17 @@ public class EventController {
         event.setStartDate(eventDTO.getStartDate());
         event.setEndDate(eventDTO.getEndDate());
         event.setCapacity(eventDTO.getCapacity());
-        event.setImage(eventDTO.getImage());
+        
+        // Process image URL to store only the relative path
+        String imageUrl = eventDTO.getImage();
+        if (imageUrl != null && !imageUrl.isEmpty()) {
+            // If it's a full URL, extract only the path part starting from /uploads
+            if (imageUrl.contains("/uploads/")) {
+                int uploadsIndex = imageUrl.indexOf("/uploads/");
+                imageUrl = imageUrl.substring(uploadsIndex);
+            }
+        }
+        event.setImage(imageUrl);
 
         Event createdEvent = eventService.createEvent(event);
         return ResponseEntity.ok(eventMapper.toResponseDTO(createdEvent));
@@ -252,7 +262,17 @@ public class EventController {
         event.setStartDate(eventUpdateDTO.getStartDate());
         event.setEndDate(eventUpdateDTO.getEndDate());
         event.setCapacity(eventUpdateDTO.getCapacity());
-        event.setImage(eventUpdateDTO.getImage());
+        
+        // Process image URL to store only the relative path
+        String imageUrl = eventUpdateDTO.getImage();
+        if (imageUrl != null && !imageUrl.isEmpty()) {
+            // If it's a full URL, extract only the path part starting from /uploads
+            if (imageUrl.contains("/uploads/")) {
+                int uploadsIndex = imageUrl.indexOf("/uploads/");
+                imageUrl = imageUrl.substring(uploadsIndex);
+            }
+        }
+        event.setImage(imageUrl);
 
         Event updatedEvent = eventService.updateEvent(id, event);
         return ResponseEntity.ok(eventMapper.toResponseDTO(updatedEvent));
