@@ -197,4 +197,21 @@ public class EventService {
             eventRepository.save(event);
         }
     }
+
+    /**
+     * Check if a user is attending a specific event
+     * @param eventId Event ID
+     * @param userId User ID
+     * @return true if user is attending, false otherwise
+     */
+    @Transactional(readOnly = true)
+    public boolean isUserAttending(Long eventId, Long userId) {
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new ResourceNotFoundException("Event not found with id: " + eventId));
+        
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+                
+        return event.getAttendees().contains(user);
+    }
 }

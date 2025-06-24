@@ -318,6 +318,18 @@ public class EventController {
         return ResponseEntity.ok(eventMapper.toResponseDTO(event));
     }
 
+    @GetMapping("/{eventId}/attendees/check")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Map<String, Boolean>> checkUserAttendance(
+            @PathVariable Long eventId,
+            @RequestParam Long userId
+    ) {
+        boolean isAttending = eventService.isUserAttending(eventId, userId);
+        Map<String, Boolean> response = new HashMap<>();
+        response.put("isAttending", isAttending);
+        return ResponseEntity.ok(response);
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteEvent(@PathVariable Long id) {
