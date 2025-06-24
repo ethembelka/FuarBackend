@@ -80,6 +80,7 @@ public class SecurityConfig {
                 // Protected endpoints that require authentication
                 .requestMatchers(
                     "/api/v1/auth/current-user",  // Current user endpoint requires authentication
+                    "/api/v1/education/**",  // Education management endpoints
                     "/api/v1/speakers/**",
                     "/api/v1/events/**",
                     "/api/v1/conversations/**"
