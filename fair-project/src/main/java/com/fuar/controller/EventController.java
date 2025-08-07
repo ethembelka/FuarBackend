@@ -158,15 +158,40 @@ public class EventController {
     }
 
     @GetMapping
-    public ResponseEntity<?> getAllEvents() {
+    public ResponseEntity<?> getAllEvents(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
         try {
-            System.out.println("GET /api/v1/events çağrıldı");
-            List<Event> events = eventService.getAllEvents();
-            System.out.println("Events listesi alındı, boyut: " + events.size());
+            System.out.println("GET /api/v1/events çağrıldı - Page: " + page + ", Size: " + size);
+            
+            // Toplam etkinlik sayısını al
+            List<Event> allEvents = eventService.getAllEvents();
+            int totalEvents = allEvents.size();
+            
+            // Pagination hesapla
+            int startIndex = page * size;
+            int endIndex = Math.min(startIndex + size, allEvents.size());
+            
+            // Geçerli bir sayfa aralığı kontrolü
+            if (startIndex > allEvents.size()) {
+                return ResponseEntity.ok(java.util.Map.of(
+                    "events", new java.util.ArrayList<>(),
+                    "totalPages", (int) Math.ceil((double) totalEvents / size),
+                    "currentPage", page,
+                    "totalEvents", totalEvents
+                ));
+            }
+            
+            // Sadece mevcut sayfadaki etkinlikleri al
+            List<Event> pagedEvents = allEvents.subList(startIndex, endIndex);
+            System.out.println("Events listesi alındı, toplam boyut: " + totalEvents + 
+                               ", sayfa boyutu: " + pagedEvents.size() + 
+                               " (sayfa " + page + "/" + (int) Math.ceil((double) totalEvents / size) + ")");
             
             List<EventResponseDTO> eventDTOs = new java.util.ArrayList<>();
             
-            for (Event event : events) {
+            for (Event event : pagedEvents) {
                 try {
                     System.out.println("Event ID: " + event.getId() + " dönüştürülüyor");
                     if (event.getSpeakers() != null) {
@@ -181,7 +206,13 @@ public class EventController {
                 }
             }
             
-            return ResponseEntity.ok(eventDTOs);
+            // Pagination meta bilgilerini içeren cevap döndür
+            return ResponseEntity.ok(java.util.Map.of(
+                "events", eventDTOs,
+                "totalPages", (int) Math.ceil((double) totalEvents / size),
+                "currentPage", page,
+                "totalEvents", totalEvents
+            ));
         } catch (Exception e) {
             System.err.println("getAllEvents metodunda hata: " + e.getMessage());
             e.printStackTrace();
