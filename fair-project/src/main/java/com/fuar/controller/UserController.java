@@ -99,14 +99,85 @@ public class UserController {
     }
 
     /**
-     * Get all users
+     * Get all users with pagination
      * @param role Optional role filter
-     * @return List of users
+     * @param page Page number (0-based)
+     * @param size Page size
+     * @param sortBy Field to sort by
+     * @param direction Sort direction (asc or desc)
+     * @return Page of users
      */
     @GetMapping
-    public ResponseEntity<List<User>> getAllUsers(@RequestParam(required = false) Role role) {
+    public ResponseEntity<?> getAllUsers(
+            @RequestParam(required = false) Role role,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "asc") String direction,
+            @RequestParam(required = false) String search) {
+        
         try {
-            System.out.println("GET /api/v1/users çağrıldı");
+            System.out.println("GET /api/v1/users çağrıldı - Sayfa: " + page + ", Boyut: " + size);
+            
+            // Validate pagination parameters
+            if (page < 0) {
+                return ResponseEntity.badRequest().body("Page number cannot be negative");
+            }
+            
+            if (size <= 0 || size > 100) {
+                return ResponseEntity.badRequest().body("Page size must be between 1 and 100");
+            }
+            
+            // Create pageable object for pagination and sorting
+            org.springframework.data.domain.Sort.Direction sortDirection = 
+                direction.equalsIgnoreCase("desc") ? 
+                org.springframework.data.domain.Sort.Direction.DESC : 
+                org.springframework.data.domain.Sort.Direction.ASC;
+            
+            org.springframework.data.domain.Pageable pageable = 
+                org.springframework.data.domain.PageRequest.of(
+                    page, size, 
+                    org.springframework.data.domain.Sort.by(sortDirection, sortBy)
+                );
+            
+            org.springframework.data.domain.Page<User> userPage;
+            
+            // Handle search if provided
+            if (search != null && !search.trim().isEmpty()) {
+                userPage = userRepository.findByNameContainingIgnoreCaseOrEmailContainingIgnoreCase(
+                    search.trim(), search.trim(), pageable);
+                System.out.println("Arama: '" + search + "' ile " + userPage.getTotalElements() + " kullanıcı bulundu");
+            } 
+            // Handle role filter if provided
+            else if (role != null) {
+                userPage = userRepository.findByRole(role, pageable);
+                System.out.println(role + " rolüne sahip " + userPage.getTotalElements() + " kullanıcı bulundu");
+            } 
+            // Get all users with pagination
+            else {
+                userPage = userRepository.findAll(pageable);
+                System.out.println("Toplam " + userPage.getTotalElements() + " kullanıcı bulundu");
+            }
+            
+            // Remove sensitive information before returning
+            userPage.getContent().forEach(user -> user.setPassword(null));
+            
+            return ResponseEntity.ok(userPage);
+        } catch (Exception e) {
+            System.err.println("Kullanıcılar alınırken hata oluştu: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body("Error fetching users: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Legacy endpoint for getting all users without pagination (for backward compatibility)
+     * @return List of all users
+     */
+    @GetMapping("/all")
+    public ResponseEntity<List<User>> getAllUsersLegacy(@RequestParam(required = false) Role role) {
+        try {
+            System.out.println("GET /api/v1/users/all çağrıldı");
             List<User> users;
             
             if (role != null) {
