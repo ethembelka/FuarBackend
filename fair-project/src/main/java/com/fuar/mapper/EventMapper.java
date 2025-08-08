@@ -1,15 +1,26 @@
 package com.fuar.mapper;
 
+import com.fuar.dto.EventDTO;
 import com.fuar.dto.EventResponseDTO;
+import com.fuar.dto.EventSessionDTO;
 import com.fuar.dto.UserSummaryDTO;
 import com.fuar.model.Event;
+import com.fuar.model.EventSession;
 import com.fuar.model.User;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Component
+@RequiredArgsConstructor
 public class EventMapper {
+    
+    private final EventSessionMapper sessionMapper;
 
     public EventResponseDTO toResponseDTO(Event event) {
         if (event == null) {
@@ -31,6 +42,15 @@ public class EventMapper {
                     .createdAt(event.getCreatedAt())
                     .updatedAt(event.getUpdatedAt())
                     .build();
+                    
+            // Event oturumlarını dönüştür ve başlangıç zamanına göre sırala
+            if (event.getSessions() != null && !event.getSessions().isEmpty()) {
+                List<EventSessionDTO> sessionDTOs = event.getSessions().stream()
+                    .sorted((s1, s2) -> s1.getStartTime().compareTo(s2.getStartTime())) // Başlangıç zamanına göre artan sıralama
+                    .map(sessionMapper::toDto)
+                    .collect(Collectors.toList());
+                dto.setSessions(sessionDTOs);
+            }
             
             System.out.println("Temel event özellikleri dönüştürüldü, speakers'a geçiliyor");
             
@@ -177,5 +197,38 @@ public class EventMapper {
             e.printStackTrace();
             return null; // Return null to be filtered out in the stream
         }
+    }
+    
+    public Event toEntity(EventDTO dto) {
+        if (dto == null) {
+            return null;
+        }
+        
+        Event event = Event.builder()
+                .id(dto.getId())
+                .title(dto.getTitle())
+                .description(dto.getDescription())
+                .location(dto.getLocation())
+                .startDate(dto.getStartDate())
+                .endDate(dto.getEndDate())
+                .capacity(dto.getCapacity())
+                .image(dto.getImage())
+                .speakers(new HashSet<>())
+                .attendees(new HashSet<>())
+                .sessions(new ArrayList<>())
+                .build();
+                
+        // Session'ları işle
+        if (dto.getSessions() != null && !dto.getSessions().isEmpty()) {
+            List<EventSession> sessions = new ArrayList<>();
+            for (EventSessionDTO sessionDTO : dto.getSessions()) {
+                EventSession session = sessionMapper.toEntity(sessionDTO);
+                session.setEvent(event);
+                sessions.add(session);
+            }
+            event.setSessions(sessions);
+        }
+        
+        return event;
     }
 }

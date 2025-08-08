@@ -11,6 +11,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Set;
 
 @Data
@@ -42,4 +43,5 @@ public class EventDTO implements EventDateContainer {
     private String image;
     private Set<Long> speakerIds;
     private Set<Long> attendeeIds;
+    private List<EventSessionDTO> sessions;
 }

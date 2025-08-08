@@ -1,6 +1,6 @@
 package com.fuar.model;
 
-import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -10,20 +10,16 @@ import lombok.Setter;
 import lombok.ToString;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
 
 @Getter
 @Setter
-@ToString(exclude = {"speakers", "attendees", "sessions"})
+@ToString(exclude = {"event"})
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
-@Table(name = "events")
-public class Event {
+@Table(name = "event_sessions")
+public class EventSession {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -35,46 +31,25 @@ public class Event {
     private String description;
 
     @Column(nullable = false)
+    private LocalDateTime startTime;
+
+    @Column(nullable = false)
+    private LocalDateTime endTime;
+
+    @Column
+    private String speakerName;
+    
+    @Column
     private String location;
 
-    @Column(nullable = false)
-    private LocalDateTime startDate;
-
-    @Column(nullable = false)
-    private LocalDateTime endDate;
-
-    private Integer capacity;
-
-    private String image;
-
-    @ManyToMany(fetch = FetchType.EAGER)
-    @JoinTable(
-        name = "event_speakers",
-        joinColumns = @JoinColumn(name = "event_id"),
-        inverseJoinColumns = @JoinColumn(name = "user_id")
-    )
-    @Builder.Default
-    @JsonManagedReference("event-speakers")
-    private Set<User> speakers = new HashSet<>();
-
-    @ManyToMany(fetch = FetchType.EAGER)
-    @JoinTable(
-        name = "event_attendees",
-        joinColumns = @JoinColumn(name = "event_id"),
-        inverseJoinColumns = @JoinColumn(name = "user_id")
-    )
-    @Builder.Default
-    @JsonManagedReference("event-attendees")
-    private Set<User> attendees = new HashSet<>();
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "event_id", nullable = false)
+    @JsonBackReference
+    private Event event;
 
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
-
-    @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
-    @JsonManagedReference
-    private List<EventSession> sessions = new ArrayList<>();
 
     @PrePersist
     protected void onCreate() {
@@ -93,7 +68,7 @@ public class Event {
         int result = 1;
         result = prime * result + ((id == null) ? 0 : id.hashCode());
         result = prime * result + ((title == null) ? 0 : title.hashCode());
-        result = prime * result + ((startDate == null) ? 0 : startDate.hashCode());
+        result = prime * result + ((startTime == null) ? 0 : startTime.hashCode());
         return result;
     }
 
@@ -102,7 +77,7 @@ public class Event {
         if (this == obj) return true;
         if (obj == null) return false;
         if (getClass() != obj.getClass()) return false;
-        Event other = (Event) obj;
+        EventSession other = (EventSession) obj;
         if (id == null) {
             if (other.id != null) return false;
         } else if (!id.equals(other.id)) {
