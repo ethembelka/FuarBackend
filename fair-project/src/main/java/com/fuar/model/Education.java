@@ -31,6 +31,12 @@ public class Education {
 
     @Column(nullable = false)
     private String fieldOfStudy;
+    
+    @Column
+    private String major;
+    
+    @Column
+    private String degree;
 
     @Column(columnDefinition = "TEXT")
     private String description;

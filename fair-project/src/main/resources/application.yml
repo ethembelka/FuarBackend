@@ -1,6 +1,12 @@
 server:
   port: 8080
 
+springdoc:
+  swagger-ui:
+    enabled: false
+  api-docs:
+    enabled: false
+
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/fuar_dbb

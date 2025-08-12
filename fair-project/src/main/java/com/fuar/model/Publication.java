@@ -25,6 +25,9 @@ public class Publication {
 
     @Column(nullable = false)
     private String title;
+    
+    @Column
+    private String topic;
 
     @Column(columnDefinition = "TEXT")
     private String description;

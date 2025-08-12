@@ -28,6 +28,9 @@ public class WorkExperience {
 
     @Column(nullable = false)
     private String position;
+    
+    @Column
+    private String sector;
 
     @Column(columnDefinition = "TEXT")
     private String description;
