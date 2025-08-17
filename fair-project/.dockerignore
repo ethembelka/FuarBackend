@@ -1,0 +1,36 @@
+# Git
+.git
+.gitignore
+
+# Build artifacts
+build/
+.gradle/
+gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Application logs
+logs/
+*.log
+
+# Runtime
+uploads/
+
+# Docker files
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Documentation
+*.md
+README.md
